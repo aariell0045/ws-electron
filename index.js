@@ -150,8 +150,6 @@ ipcMain.on("start", async (event, item) => {
 
           await sendButton[0].click();
 
-          await driver.sleep(3000);
-
           let sandTimer = null;
 
           do {
@@ -159,13 +157,12 @@ ipcMain.on("start", async (event, item) => {
               By.css(elementsSelectores.sandClock)
             );
 
-            await driver.sleep(2000);
+            await driver.sleep(1000);
           } while (sandTimer[0]);
         } catch (err) {
           console.log(err);
         }
       }
-      await driver.sleep(2000);
       let sendedToArcive = null;
 
       while (!sendedToArcive) {
@@ -189,16 +186,16 @@ ipcMain.on("start", async (event, item) => {
 
         await actions.contextClick(contactBox[0]).perform();
 
-        await driver.sleep(4000);
+        await driver.sleep(1000);
         const contactMenu = await driver.wait(
           until.elementsLocated(By.className("_2oldI")),
           10000,
           "send contact box to the archive"
         );
-        await driver.sleep(2000);
         await contactMenu[0].click();
-        await driver.sleep(1500);
+        await driver.sleep(500);
         sendedToArcive = await driver.findElements(By.className("_1Ftww"));
+        await driver.sleep(1000);
       }
 
       let time = new Date();
