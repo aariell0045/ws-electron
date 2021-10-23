@@ -36,9 +36,8 @@ app.on("ready", () => {
 });
 
 function insertNameToMessage(message, name) {
-  console.log("this is the message:", message);
-  console.log("this is the name:", name);
   message = message.replaceAll(`( שם פרטי )`, name);
+
   return message;
 }
 
@@ -46,7 +45,7 @@ ipcMain.on("start", async (event, item) => {
   const { caps, forBrowser, userId } = item.elementsSelectores;
 
   const { currentMessage, currentGroup, elementsSelectores } = item;
-  console.log(currentGroup);
+
   const caps_ = new Capabilities();
   caps_.setPageLoadStrategy(caps.setPageLoadStrategy);
   caps_.setAlertBehavior(caps.setAlertBehavior);
@@ -113,59 +112,49 @@ ipcMain.on("start", async (event, item) => {
         messageIndex < currentMessage.contentMessage.length;
         messageIndex++
       ) {
+        let contactFirstName = currentGroup.contacts[i].contactProfile
+          .contactFirstName
+          ? currentGroup.contacts[i].contactProfile.contactFirstName
+          : "";
         newMessage = insertNameToMessage(
           currentMessage.contentMessage[messageIndex].contentField,
-          currentGroup.contacts[i].contactProfile.contactFirstName
-            ? currentGroup.contacts[i].contactProfile.contactFirstName
-            : ""
+          contactFirstName
         );
-      }
 
-      // currentMessage.contentMessage[0].contentField;
-
-      for (
-        let messageIndex = 0;
-        messageIndex < currentMessage.contentMessage.length;
-        messageIndex++
-      ) {
-        try {
-          let messageFormat = "";
-          for (let char of newMessage) {
-            if (char === "\n") {
-              char = `${Key.SHIFT + Key.ENTER}`;
-            }
-            messageFormat += char;
+        let messageFormat = "";
+        for (let char of newMessage) {
+          if (char === "\n") {
+            char = `${Key.SHIFT + Key.ENTER}`;
           }
-          const messageInput = await driver.wait(
-            until.elementsLocated(By.className("p3_M1")),
-            10000,
-            "MessageInput",
-            2000
+          messageFormat += char;
+        }
+        const messageInput = await driver.wait(
+          until.elementsLocated(By.className("p3_M1")),
+          4000,
+          "Message-Input"
+        );
+
+        do {
+          await messageInput[0].sendKeys(messageFormat);
+          sendButton = await driver.findElements(By.className("_4sWnG"));
+        } while (!sendButton[0]);
+
+        await sendButton[0].click();
+
+        let sandTimer = null;
+
+        do {
+          sandTimer = await driver.findElements(
+            By.css(elementsSelectores.sandClock)
           );
 
-          do {
-            await messageInput[0].sendKeys(messageFormat);
-            sendButton = await driver.findElements(By.className("_4sWnG"));
-          } while (!sendButton[0]);
-
-          await sendButton[0].click();
-
-          let sandTimer = null;
-
-          do {
-            sandTimer = await driver.findElements(
-              By.css(elementsSelectores.sandClock)
-            );
-
-            await driver.sleep(1000);
-          } while (sandTimer[0]);
-        } catch (err) {
-          console.log(err);
-        }
+          await driver.sleep(1000);
+        } while (sandTimer[0]);
       }
-      let sendedToArcive = null;
 
-      while (!sendedToArcive) {
+      let sendedToArcive = [];
+      let counter = 0;
+      while (!sendedToArcive.length && counter < 2) {
         const findChatInputs = await driver.wait(
           until.elementsLocated(By.className("_13NKt")),
           10000,
@@ -178,33 +167,36 @@ ipcMain.on("start", async (event, item) => {
           Key.ENTER
         );
 
-        const contactBox = await driver.wait(
-          until.elementsLocated(By.className("_2_TVt")),
-          10000,
-          "find contact box that on focos"
-        );
+        const contactBox = await driver.findElements(By.className("_2_TVt"));
+        console.log("contactBox:", contactBox);
+        if (contactBox.length) {
+          await actions.contextClick(contactBox[0]).perform();
 
-        await actions.contextClick(contactBox[0]).perform();
-
-        await driver.sleep(1000);
-        const contactMenu = await driver.wait(
-          until.elementsLocated(By.className("_2oldI")),
-          10000,
-          "send contact box to the archive"
-        );
-        await contactMenu[0].click();
-        await driver.sleep(500);
-        sendedToArcive = await driver.findElements(By.className("_1Ftww"));
-        await driver.sleep(1000);
+          const contactMenu = await driver.wait(
+            until.elementsLocated(By.className("_2oldI")),
+            10000,
+            "send contact box to the archive"
+          );
+          await contactMenu[0].click();
+          await driver.sleep(500);
+          sendedToArcive = await driver.findElements(By.className("_3ya1x"));
+          await driver.sleep(1000);
+        } else {
+          await driver.sleep(1000);
+          counter++;
+        }
       }
 
       let time = new Date();
       let year = time.getFullYear();
-      let month = time.getMonth();
-      let day = time.getDate() + 1;
-      const currentDate = `${year}/${month}/${day}`;
+      let month = time.getMonth() + 1;
+      let day = time.getDate();
+      let hour = time.getHours();
+      let min = time.getMinutes();
+      const currentDate = `${day}/${month}/${year} ${hour}:${min}`;
       const newHistoryItem = {
         messageName: currentMessage.messageName,
+        contentMessage: currentMessage.contentMessage,
         groupName: currentGroup.groupName,
         sendDate: currentDate,
       };
@@ -212,15 +204,33 @@ ipcMain.on("start", async (event, item) => {
         { _id: userId },
         {
           $set: {
-            history: [...currentUser.history, newHistoryItem],
+            history: [newHistoryItem, ...currentUser.history],
           },
         }
       );
     } catch (err) {
-      console.log(err.message);
+      console.log("err.message:", err.message);
       if (err.message.includes("initial-program-start-working")) {
         console.log("initial-program-start-working");
-        i--;
+      }
+      if (err.message.includes("element not interactable")) {
+        console.log("element not interactable");
+        await driver.navigate().refresh();
+      }
+      if (err.message.includes("chrome not reachable")) {
+        await driver.navigate().refresh();
+      }
+      if (err.message.includes("unexpected alert open")) {
+        console.log("unexpected alert open");
+        const body = await driver.wait(
+          until.elementLocated(By.tagName("body")),
+          3000
+        );
+        body.sendKeys(Key.ENTER);
+      }
+
+      if (err.message.includes("Message-Input")) {
+        continue;
       }
     }
   }
