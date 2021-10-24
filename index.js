@@ -4,7 +4,14 @@ const { ipcMain, ipcRenderer } = require("electron");
 const mongoose = require("mongoose");
 const User = require("./Schema/User");
 require("chromedriver").path;
-const { Builder, By, Key, until, Capabilities } = require("selenium-webdriver");
+const {
+  Builder,
+  By,
+  Key,
+  until,
+  Capabilities,
+  Actions,
+} = require("selenium-webdriver");
 const path = require("path");
 let mainWindow;
 const env = process.env.Path;
@@ -126,16 +133,22 @@ ipcMain.on("start", async (event, item) => {
           if (char === "\n") {
             char = `${Key.SHIFT + Key.ENTER}`;
           }
+
           messageFormat += char;
         }
         const messageInput = await driver.wait(
-          until.elementsLocated(By.className("p3_M1")),
+          until.elementsLocated(By.className("_13NKt ")),
           4000,
           "Message-Input"
         );
 
+        await driver.executeScript(
+          `const inputs = document.getElementsByClassName('_13NKt'); inputs[1].innerText = '${messageFormat}';`
+        );
+        const data = await messageInput[1].getAttribute("innerText");
+        console.log("data:", data);
         do {
-          await messageInput[0].sendKeys(messageFormat);
+          await messageInput[1].sendKeys(".", Key.BACK_SPACE);
           sendButton = await driver.findElements(By.className("_4sWnG"));
         } while (!sendButton[0]);
 
@@ -147,8 +160,6 @@ ipcMain.on("start", async (event, item) => {
           sandTimer = await driver.findElements(
             By.css(elementsSelectores.sandClock)
           );
-
-          await driver.sleep(1000);
         } while (sandTimer[0]);
       }
 
