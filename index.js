@@ -101,6 +101,7 @@ ipcMain.on("start", async (event, item) => {
     const currentUser = await User.findById({ _id: userId });
     let newMessage = "";
     let sendButton = null;
+    let messageInput = null;
     const actions = driver.actions({ async: true });
     try {
       await driver.get(
@@ -127,6 +128,12 @@ ipcMain.on("start", async (event, item) => {
           currentMessage.contentMessage[messageIndex].contentField,
           contactFirstName
         );
+        if (
+          !currentMessage.contentMessage[messageIndex].mediaSrc &&
+          !currentMessage.contentMessage[messageIndex].contentField
+        ) {
+          continue;
+        }
 
         let messageFormat = "";
         for (let char of newMessage) {
@@ -136,20 +143,46 @@ ipcMain.on("start", async (event, item) => {
 
           messageFormat += char;
         }
-        const messageInput = await driver.wait(
-          until.elementsLocated(By.className("_13NKt ")),
-          4000,
-          "Message-Input"
-        );
 
         await driver.executeScript(
-          `const inputs = document.getElementsByClassName('_13NKt'); inputs[1].innerText = '${messageFormat}';`
+          `const inputs = document.getElementsByClassName('${elementsSelectores.messageInput}'); inputs[1].innerText = '${messageFormat}';`
         );
-        const data = await messageInput[1].getAttribute("innerText");
-        console.log("data:", data);
+
         do {
+          messageInput = await driver.wait(
+            until.elementsLocated(
+              By.className(elementsSelectores.messageInput)
+            ),
+            4000,
+            "Message-Input"
+          );
+
           await messageInput[1].sendKeys(".", Key.BACK_SPACE);
-          sendButton = await driver.findElements(By.className("_4sWnG"));
+          const mediaSrc = currentMessage.contentMessage[messageIndex].mediaSrc;
+          console.log(mediaSrc);
+          if (mediaSrc) {
+            const openMediaSpan = await driver.wait(
+              until.elementLocated(By.css(elementsSelectores.openMediaSpan)),
+              10000
+            );
+            await openMediaSpan.click();
+            await driver.sleep(1000);
+            const inputFile = await driver.wait(
+              until.elementLocated(By.css(elementsSelectores.inputFile)),
+              10000
+            );
+            await inputFile.sendKeys(mediaSrc);
+            sendButton = await driver.wait(
+              until.elementsLocated(
+                By.className(elementsSelectores.sendButtonWidthMedia)
+              ),
+              10000
+            );
+          } else {
+            sendButton = await driver.findElements(
+              By.className(elementsSelectores.sendButton)
+            );
+          }
         } while (!sendButton[0]);
 
         await sendButton[0].click();
@@ -157,17 +190,20 @@ ipcMain.on("start", async (event, item) => {
         let sandTimer = null;
 
         do {
+          await driver.sleep(1000);
           sandTimer = await driver.findElements(
             By.css(elementsSelectores.sandClock)
           );
+          console.log("sandTimer:", sandTimer);
         } while (sandTimer[0]);
+        await driver.sleep(1000);
       }
 
       let sendedToArcive = [];
       let counter = 0;
       while (!sendedToArcive.length && counter < 2) {
         const findChatInputs = await driver.wait(
-          until.elementsLocated(By.className("_13NKt")),
+          until.elementsLocated(By.className(elementsSelectores.messageInput)),
           10000,
           "catch array of inputs",
           3000
@@ -178,19 +214,23 @@ ipcMain.on("start", async (event, item) => {
           Key.ENTER
         );
 
-        const contactBox = await driver.findElements(By.className("_2_TVt"));
-        console.log("contactBox:", contactBox);
+        const contactBox = await driver.findElements(
+          By.className(elementsSelectores.contactBox)
+        );
+
         if (contactBox.length) {
           await actions.contextClick(contactBox[0]).perform();
 
           const contactMenu = await driver.wait(
-            until.elementsLocated(By.className("_2oldI")),
+            until.elementsLocated(By.className(elementsSelectores.contactMenu)),
             10000,
             "send contact box to the archive"
           );
           await contactMenu[0].click();
           await driver.sleep(500);
-          sendedToArcive = await driver.findElements(By.className("_3ya1x"));
+          sendedToArcive = await driver.findElements(
+            By.className(elementsSelectores.sendedToArcive)
+          );
           await driver.sleep(1000);
         } else {
           await driver.sleep(1000);
