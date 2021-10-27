@@ -198,6 +198,14 @@ ipcMain.on("start", async (event, item) => {
         } while (sandTimer[0]);
         await driver.sleep(1000);
       }
+      await User.findByIdAndUpdate(
+        { _id: userId },
+        {
+          $inc: {
+            messagesStatus: -1,
+          },
+        }
+      );
 
       let sendedToArcive = [];
       let counter = 0;
