@@ -86,6 +86,35 @@ ipcMain.on("start", async (event, item) => {
   );
 
   const startPoint = elementsSelectores.starterIndex;
+  const currentUser = await User.findById({ _id: userId });
+  let time = new Date();
+  let year = time.getFullYear();
+  let month = time.getMonth() + 1;
+  let day = time.getDate();
+  let hour = time.getHours();
+  let min = time.getMinutes();
+  if (min.toString().length === 1) {
+    min = min + "0";
+  }
+
+  if (hour.toString().length === 1) {
+    hour = "0" + hour;
+  }
+  const currentDate = `${day}/${month}/${year} ${hour}:${min}`;
+  const newHistory = {
+    messageName: currentMessage.messageName,
+    contentMessage: currentMessage.contentMessage,
+    groupName: currentGroup.groupName,
+    sendDate: currentDate,
+  };
+  await User.findByIdAndUpdate(
+    { _id: userId },
+    {
+      $push: {
+        history: newHistory,
+      },
+    }
+  );
 
   for (let i = startPoint; i < currentGroup.contacts.length; i++) {
     updateCurrentGroup.currentGroupIndex = i;
@@ -98,7 +127,6 @@ ipcMain.on("start", async (event, item) => {
       }
     );
 
-    const currentUser = await User.findById({ _id: userId });
     let newMessage = "";
     let sendButton = null;
     let messageInput = null;
@@ -138,7 +166,7 @@ ipcMain.on("start", async (event, item) => {
         let messageFormat = "";
         for (let char of newMessage) {
           if (char === "\n") {
-            char = `${Key.SHIFT + Key.ENTER}`;
+            char = `\\n`;
           }
 
           messageFormat += char;
@@ -245,28 +273,6 @@ ipcMain.on("start", async (event, item) => {
           counter++;
         }
       }
-
-      let time = new Date();
-      let year = time.getFullYear();
-      let month = time.getMonth() + 1;
-      let day = time.getDate();
-      let hour = time.getHours();
-      let min = time.getMinutes();
-      const currentDate = `${day}/${month}/${year} ${hour}:${min}`;
-      const newHistoryItem = {
-        messageName: currentMessage.messageName,
-        contentMessage: currentMessage.contentMessage,
-        groupName: currentGroup.groupName,
-        sendDate: currentDate,
-      };
-      await User.findByIdAndUpdate(
-        { _id: userId },
-        {
-          $set: {
-            history: [newHistoryItem, ...currentUser.history],
-          },
-        }
-      );
     } catch (err) {
       console.log("err.message:", err.message);
       if (err.message.includes("initial-program-start-working")) {
