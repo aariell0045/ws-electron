@@ -1,18 +1,17 @@
 const electron = require("electron");
 const { app, BrowserWindow } = electron;
 const { ipcMain, ipcRenderer } = require("electron");
+const { Builder, By, Key, until, Capabilities } = require("selenium-webdriver");
+require("chromedriver").path;
 const mongoose = require("mongoose");
 const User = require("./Schema/User");
-require("chromedriver").path;
-const {
-  Builder,
-  By,
-  Key,
-  until,
-  Capabilities,
-  Actions,
-} = require("selenium-webdriver");
+const { insertNameToMessage } = require("./handlers/message-handlers");
+
 const path = require("path");
+const {
+  updateUserHistory,
+} = require("./handlers/user-async-functions-handlers");
+const { createFullDateWidthCurrentTime } = require("./handlers/date-handlers");
 let mainWindow;
 const env = process.env.Path;
 let newPathArray = env.split(";");
@@ -42,12 +41,6 @@ app.on("ready", () => {
   //http://localhost:3000
 });
 
-function insertNameToMessage(message, name) {
-  message = message.replaceAll(`( שם פרטי )`, name);
-
-  return message;
-}
-
 ipcMain.on("start", async (event, item) => {
   const { caps, forBrowser, userId } = item.elementsSelectores;
 
@@ -76,6 +69,7 @@ ipcMain.on("start", async (event, item) => {
   //=======================================
 
   let updateCurrentGroup = { ...currentGroup, currentGroupIndex: 0 };
+
   await User.findByIdAndUpdate(
     { _id: userId },
     {
@@ -86,27 +80,18 @@ ipcMain.on("start", async (event, item) => {
   );
 
   const startPoint = elementsSelectores.starterIndex;
-  const currentUser = await User.findById({ _id: userId });
-  let time = new Date();
-  let year = time.getFullYear();
-  let month = time.getMonth() + 1;
-  let day = time.getDate();
-  let hour = time.getHours();
-  let min = time.getMinutes();
-  if (min.toString().length === 1) {
-    min = min + "0";
-  }
-
-  if (hour.toString().length === 1) {
-    hour = "0" + hour;
-  }
-  const currentDate = `${day}/${month}/${year} ${hour}:${min}`;
+  const endPoint = elementsSelectores.endIndex;
+  const currentUser = await getUser(userId);
+  const currentDate = createFullDateWidthCurrentTime();
   const newHistory = {
     messageName: currentMessage.messageName,
     contentMessage: currentMessage.contentMessage,
     groupName: currentGroup.groupName,
     sendDate: currentDate,
+    startPoint: +startPoint,
+    currentPoint: +startPoint,
   };
+
   await User.findByIdAndUpdate(
     { _id: userId },
     {
@@ -115,9 +100,9 @@ ipcMain.on("start", async (event, item) => {
       },
     }
   );
-
-  for (let i = startPoint; i < currentGroup.contacts.length; i++) {
-    updateCurrentGroup.currentGroupIndex = i;
+  console.log(startPoint, endPoint);
+  for (let i = +startPoint; i < +endPoint; i++) {
+    const DRIVER_GET_URL = (updateCurrentGroup.currentGroupIndex = i);
     await User.findByIdAndUpdate(
       { _id: userId },
       {
@@ -127,20 +112,29 @@ ipcMain.on("start", async (event, item) => {
       }
     );
 
+    const newHistory = {
+      messageName: currentMessage.messageName,
+      contentMessage: currentMessage.contentMessage,
+      groupName: currentGroup.groupName,
+      sendDate: currentDate,
+      startPoint: +startPoint,
+      currentPoint: i + 1,
+    };
+    currentUser.history[currentUser.history.length - 1] = newHistory;
+
+    updateUserHistory(currentUser.history);
+
     let newMessage = "";
     let sendButton = null;
     let messageInput = null;
     const actions = driver.actions({ async: true });
     try {
-      await driver.get(
-        `https://web.whatsapp.com/send?phone=${currentGroup.contacts[i].phoneNumber}`
-      );
+      await driver.get();
 
       await driver.wait(
         until.elementLocated(By.id(elementsSelectores.whatsappSideBar)),
-        100000,
-        "initial-program-start-working",
-        5000
+        1000000,
+        "initial-program-start-working"
       );
 
       for (
@@ -226,6 +220,20 @@ ipcMain.on("start", async (event, item) => {
         } while (sandTimer[0]);
         await driver.sleep(1000);
       }
+      let updateCurrentGroup = {
+        ...currentUser.currentGroup,
+        currentGroupIndex: i,
+      };
+      let newCurrentGroup = updateCurrentGroup;
+      console.log(updateCurrentGroup);
+      await User.findByIdAndUpdate(
+        { _id: userId },
+        {
+          $set: {
+            currentGroup: newCurrentGroup,
+          },
+        }
+      );
       await User.findByIdAndUpdate(
         { _id: userId },
         {
@@ -275,7 +283,12 @@ ipcMain.on("start", async (event, item) => {
       }
     } catch (err) {
       console.log("err.message:", err.message);
+      if (err.message.includes("(setting 'innerText')")) {
+        i--;
+        console.log("Error : innerText");
+      }
       if (err.message.includes("initial-program-start-working")) {
+        i--;
         console.log("initial-program-start-working");
       }
       if (err.message.includes("element not interactable")) {
