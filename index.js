@@ -1,15 +1,23 @@
 const electron = require("electron");
 const { app, BrowserWindow } = electron;
 const { ipcMain, ipcRenderer } = require("electron");
-const { Builder, By, Key, until, Capabilities } = require("selenium-webdriver");
-require("chromedriver").path;
 const mongoose = require("mongoose");
 const User = require("./Schema/User");
-const { insertNameToMessage } = require("./handlers/message-handlers");
-
+require("chromedriver").path;
+const {
+  Builder,
+  By,
+  Key,
+  until,
+  Capabilities,
+  Actions,
+} = require("selenium-webdriver");
 const path = require("path");
 const {
+  getUser,
+  pushToUserHistory,
   updateUserHistory,
+  updateMessagesStatus,
 } = require("./handlers/user-async-functions-handlers");
 const { createFullDateWidthCurrentTime } = require("./handlers/date-handlers");
 let mainWindow;
@@ -41,6 +49,12 @@ app.on("ready", () => {
   //http://localhost:3000
 });
 
+function insertNameToMessage(message, name) {
+  message = message.replaceAll(`( שם פרטי )`, name);
+
+  return message;
+}
+
 ipcMain.on("start", async (event, item) => {
   const { caps, forBrowser, userId } = item.elementsSelectores;
 
@@ -68,20 +82,10 @@ ipcMain.on("start", async (event, item) => {
   /*checking if this user is valid to send messages */
   //=======================================
 
-  let updateCurrentGroup = { ...currentGroup, currentGroupIndex: 0 };
-
-  await User.findByIdAndUpdate(
-    { _id: userId },
-    {
-      $set: {
-        currentGroup: updateCurrentGroup,
-      },
-    }
-  );
-
   const startPoint = elementsSelectores.starterIndex;
   const endPoint = elementsSelectores.endIndex;
   const currentUser = await getUser(userId);
+
   const currentDate = createFullDateWidthCurrentTime();
   const newHistory = {
     messageName: currentMessage.messageName,
@@ -92,26 +96,10 @@ ipcMain.on("start", async (event, item) => {
     currentPoint: +startPoint,
   };
 
-  await User.findByIdAndUpdate(
-    { _id: userId },
-    {
-      $push: {
-        history: newHistory,
-      },
-    }
-  );
-  console.log(startPoint, endPoint);
-  for (let i = +startPoint; i < +endPoint; i++) {
-    const DRIVER_GET_URL = (updateCurrentGroup.currentGroupIndex = i);
-    await User.findByIdAndUpdate(
-      { _id: userId },
-      {
-        $set: {
-          currentGroup: updateCurrentGroup,
-        },
-      }
-    );
+  await pushToUserHistory(newHistory, userId);
 
+  for (let i = +startPoint; i < +endPoint; i++) {
+    const DRIVER_GET_URL = `https://web.whatsapp.com/send?phone=${currentGroup.contacts[i].phoneNumber}`;
     const newHistory = {
       messageName: currentMessage.messageName,
       contentMessage: currentMessage.contentMessage,
@@ -121,15 +109,14 @@ ipcMain.on("start", async (event, item) => {
       currentPoint: i + 1,
     };
     currentUser.history[currentUser.history.length - 1] = newHistory;
-
-    updateUserHistory(currentUser.history);
+    await updateUserHistory(currentUser.history, userId);
 
     let newMessage = "";
     let sendButton = null;
     let messageInput = null;
     const actions = driver.actions({ async: true });
     try {
-      await driver.get();
+      await driver.get(DRIVER_GET_URL);
 
       await driver.wait(
         until.elementLocated(By.id(elementsSelectores.whatsappSideBar)),
@@ -165,6 +152,8 @@ ipcMain.on("start", async (event, item) => {
 
           messageFormat += char;
         }
+
+        await driver.sleep(500);
 
         await driver.executeScript(
           `const inputs = document.getElementsByClassName('${elementsSelectores.messageInput}'); inputs[1].innerText = '${messageFormat}';`
@@ -224,24 +213,8 @@ ipcMain.on("start", async (event, item) => {
         ...currentUser.currentGroup,
         currentGroupIndex: i,
       };
-      let newCurrentGroup = updateCurrentGroup;
-      console.log(updateCurrentGroup);
-      await User.findByIdAndUpdate(
-        { _id: userId },
-        {
-          $set: {
-            currentGroup: newCurrentGroup,
-          },
-        }
-      );
-      await User.findByIdAndUpdate(
-        { _id: userId },
-        {
-          $inc: {
-            messagesStatus: -1,
-          },
-        }
-      );
+
+      await updateMessagesStatus(userId);
 
       let sendedToArcive = [];
       let counter = 0;
@@ -284,7 +257,6 @@ ipcMain.on("start", async (event, item) => {
     } catch (err) {
       console.log("err.message:", err.message);
       if (err.message.includes("(setting 'innerText')")) {
-        i--;
         console.log("Error : innerText");
       }
       if (err.message.includes("initial-program-start-working")) {
@@ -313,4 +285,5 @@ ipcMain.on("start", async (event, item) => {
     }
   }
   await driver.quit();
+  driver = null;
 });

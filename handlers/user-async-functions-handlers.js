@@ -22,9 +22,25 @@ const pushToUserHistory = async (newHistory, userId) => {
   );
 };
 
+const updateMessagesStatus = async (userId) => {
+  await User.findByIdAndUpdate(
+    { _id: userId },
+    {
+      $inc: {
+        messagesStatus: -1,
+      },
+    }
+  );
+};
+
 const getUser = async (userId) => {
   const currentUser = await User.findById({ _id: userId });
   return currentUser;
 };
 
-module.exports = { updateUserHistory, pushToUserHistory, getUser };
+module.exports = {
+  updateUserHistory,
+  pushToUserHistory,
+  getUser,
+  updateMessagesStatus,
+};
