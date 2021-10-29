@@ -13,6 +13,13 @@ const {
   Actions,
 } = require("selenium-webdriver");
 const path = require("path");
+const {
+  getUser,
+  pushToUserHistory,
+  updateUserHistory,
+  updateMessagesStatus,
+} = require("./handlers/user-async-functions-handlers");
+const { createFullDateWidthCurrentTime } = require("./handlers/date-handlers");
 let mainWindow;
 const env = process.env.Path;
 let newPathArray = env.split(";");
@@ -75,72 +82,46 @@ ipcMain.on("start", async (event, item) => {
   /*checking if this user is valid to send messages */
   //=======================================
 
-  let updateCurrentGroup = { ...currentGroup, currentGroupIndex: 0 };
-  await User.findByIdAndUpdate(
-    { _id: userId },
-    {
-      $set: {
-        currentGroup: updateCurrentGroup,
-      },
-    }
-  );
-
   const startPoint = elementsSelectores.starterIndex;
-  const currentUser = await User.findById({ _id: userId });
-  let time = new Date();
-  let year = time.getFullYear();
-  let month = time.getMonth() + 1;
-  let day = time.getDate();
-  let hour = time.getHours();
-  let min = time.getMinutes();
-  if (min.toString().length === 1) {
-    min = min + "0";
-  }
+  const endPoint = elementsSelectores.endIndex;
+  const currentUser = await getUser(userId);
 
-  if (hour.toString().length === 1) {
-    hour = "0" + hour;
-  }
-  const currentDate = `${day}/${month}/${year} ${hour}:${min}`;
+  const currentDate = createFullDateWidthCurrentTime();
   const newHistory = {
     messageName: currentMessage.messageName,
     contentMessage: currentMessage.contentMessage,
     groupName: currentGroup.groupName,
     sendDate: currentDate,
+    startPoint: +startPoint,
+    currentPoint: +startPoint,
   };
-  await User.findByIdAndUpdate(
-    { _id: userId },
-    {
-      $push: {
-        history: newHistory,
-      },
-    }
-  );
 
-  for (let i = startPoint; i < currentGroup.contacts.length; i++) {
-    updateCurrentGroup.currentGroupIndex = i;
-    await User.findByIdAndUpdate(
-      { _id: userId },
-      {
-        $set: {
-          currentGroup: updateCurrentGroup,
-        },
-      }
-    );
+  await pushToUserHistory(newHistory, userId);
+
+  for (let i = +startPoint; i < +endPoint; i++) {
+    const DRIVER_GET_URL = `https://web.whatsapp.com/send?phone=${currentGroup.contacts[i].phoneNumber}`;
+    const newHistory = {
+      messageName: currentMessage.messageName,
+      contentMessage: currentMessage.contentMessage,
+      groupName: currentGroup.groupName,
+      sendDate: currentDate,
+      startPoint: +startPoint,
+      currentPoint: i + 1,
+    };
+    currentUser.history[currentUser.history.length - 1] = newHistory;
+    await updateUserHistory(currentUser.history, userId);
 
     let newMessage = "";
     let sendButton = null;
     let messageInput = null;
     const actions = driver.actions({ async: true });
     try {
-      await driver.get(
-        `https://web.whatsapp.com/send?phone=${currentGroup.contacts[i].phoneNumber}`
-      );
+      await driver.get(DRIVER_GET_URL);
 
       await driver.wait(
         until.elementLocated(By.id(elementsSelectores.whatsappSideBar)),
-        100000,
-        "initial-program-start-working",
-        5000
+        1000000,
+        "initial-program-start-working"
       );
 
       for (
@@ -171,6 +152,8 @@ ipcMain.on("start", async (event, item) => {
 
           messageFormat += char;
         }
+
+        await driver.sleep(500);
 
         await driver.executeScript(
           `const inputs = document.getElementsByClassName('${elementsSelectores.messageInput}'); inputs[1].innerText = '${messageFormat}';`
@@ -226,14 +209,12 @@ ipcMain.on("start", async (event, item) => {
         } while (sandTimer[0]);
         await driver.sleep(1000);
       }
-      await User.findByIdAndUpdate(
-        { _id: userId },
-        {
-          $inc: {
-            messagesStatus: -1,
-          },
-        }
-      );
+      let updateCurrentGroup = {
+        ...currentUser.currentGroup,
+        currentGroupIndex: i,
+      };
+
+      await updateMessagesStatus(userId);
 
       let sendedToArcive = [];
       let counter = 0;
@@ -275,7 +256,11 @@ ipcMain.on("start", async (event, item) => {
       }
     } catch (err) {
       console.log("err.message:", err.message);
+      if (err.message.includes("(setting 'innerText')")) {
+        console.log("Error : innerText");
+      }
       if (err.message.includes("initial-program-start-working")) {
+        i--;
         console.log("initial-program-start-working");
       }
       if (err.message.includes("element not interactable")) {
@@ -300,4 +285,5 @@ ipcMain.on("start", async (event, item) => {
     }
   }
   await driver.quit();
+  driver = null;
 });
