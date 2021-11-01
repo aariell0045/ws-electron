@@ -21,6 +21,7 @@ const {
 } = require("./handlers/user-async-functions-handlers");
 const { createFullDateWidthCurrentTime } = require("./handlers/date-handlers");
 let mainWindow;
+let uploadWindow;
 const env = process.env.Path;
 let newPathArray = env.split(";");
 const path1 = path.join(
@@ -54,6 +55,20 @@ function insertNameToMessage(message, name) {
 
   return message;
 }
+
+ipcMain.on("upload:file", async (event, props) => {
+  uploadWindow = new BrowserWindow({
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+  await uploadWindow.loadFile("./index.html");
+});
+
+ipcMain.on("upload-finish", (event, dataTable) => {
+  mainWindow.webContents.send("data-table", dataTable);
+});
 
 ipcMain.on("start", async (event, item) => {
   const { caps, forBrowser, userId } = item.elementsSelectores;
