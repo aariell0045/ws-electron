@@ -34,10 +34,18 @@ let newPath = newPathArray.join(";");
 process.env.Path = newPath;
 
 app.on("ready", () => {
-  mongoose.connect("mongodb://localhost/wsDB", {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
+  mongoose.connect(
+    "mongodb+srv://toam:123987456tofo@ws.ppnha.mongodb.net/WS?retryWrites=true&w=majority",
+    {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    }
+  );
+  mongoose.connection
+    .once("open", () => console.log("connected"))
+    .on("error", (error) => {
+      console.log("YOUR ERROR ", error);
+    });
   mainWindow = new BrowserWindow({
     webPreferences: {
       nodeIntegration: true,
@@ -46,8 +54,7 @@ app.on("ready", () => {
   });
 
   mainWindow.on("closed", () => app.quit());
-  mainWindow.loadURL(`http://localhost:3000`);
-  //http://localhost:3000
+  mainWindow.loadURL(`https://we-send-client-cloud.herokuapp.com/`);
 });
 
 function insertNameToMessage(message, name) {
