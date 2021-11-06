@@ -44,7 +44,7 @@ app.on("ready", () => {
   });
 
   mainWindow.on("closed", () => app.quit());
-  mainWindow.loadURL(`http://localhost:3000`);
+  mainWindow.loadURL(`https://we-send-client-cloud.herokuapp.com/`);
   // https://we-send-client-cloud.herokuapp.com/
   // http://localhost:3000
 });
