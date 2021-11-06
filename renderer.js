@@ -19,8 +19,7 @@ input.addEventListener("change", function (e) {
         tempArray.push(data[i][key]);
       }
       ws.push(tempArray);
-    }
-
+    };
     ipcRenderer.send("upload-finish", ws);
   };
 });

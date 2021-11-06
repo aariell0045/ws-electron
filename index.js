@@ -13,12 +13,7 @@ const {
   Actions,
 } = require("selenium-webdriver");
 const path = require("path");
-const {
-  getUser,
-  pushToUserHistory,
-  updateUserHistory,
-  updateMessagesStatus,
-} = require("./handlers/user-async-functions-handlers");
+
 const { createFullDateWidthCurrentTime } = require("./handlers/date-handlers");
 let mainWindow;
 let uploadWindow;
@@ -26,26 +21,21 @@ const env = process.env.Path;
 let newPathArray = env.split(";");
 const path1 = path.join(
   __dirname +
-    `../../app.asar.unpacked\\node_modules\\chromedriver\\lib\\chromedriver`
+    `../../app.asar.unpacked\\node_modules\\chromedriver\\lib\\chromedriver;`
 );
+
 newPathArray.push(path1);
 newPathArray = newPathArray.filter((path) => path !== "");
+// newPathArray.splice(0,1);
 let newPath = newPathArray.join(";");
 process.env.Path = newPath;
 
 app.on("ready", () => {
-  mongoose.connect(
-    "mongodb+srv://toam:123987456tofo@ws.ppnha.mongodb.net/WS?retryWrites=true&w=majority",
-    {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    }
-  );
-  mongoose.connection
-    .once("open", () => console.log("connected"))
-    .on("error", (error) => {
-      console.log("YOUR ERROR ", error);
-    });
+  const mongooseURI ="mongodb+srv://toam:123987456tofo@ws.ppnha.mongodb.net/ws";
+  mongoose.connect(mongooseURI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  });
   mainWindow = new BrowserWindow({
     webPreferences: {
       nodeIntegration: true,
@@ -90,7 +80,6 @@ ipcMain.on("start", async (event, item) => {
     .withCapabilities(caps_)
     .forBrowser(forBrowser)
     .build();
-
   await driver.get("https://web.whatsapp.com/"); // return null
 
   await driver.wait(
@@ -106,7 +95,13 @@ ipcMain.on("start", async (event, item) => {
 
   const startPoint = elementsSelectores.starterIndex;
   const endPoint = elementsSelectores.endIndex;
-  const currentUser = await getUser(userId);
+  // let currentUser ;
+  // try{
+  // currentUser = await User.findById({ _id: userId });
+  // }catch(err){
+  //   console.log("CURRENTUSER:",err);
+  // }
+
 
   const currentDate = createFullDateWidthCurrentTime();
   const newHistory = {
@@ -118,9 +113,23 @@ ipcMain.on("start", async (event, item) => {
     currentPoint: +startPoint,
   };
 
-  await pushToUserHistory(newHistory, userId);
-
-  for (let i = +startPoint; i < +endPoint; i++) {
+  console.log("start:", startPoint);
+  console.log("end:", endPoint);
+  // try{
+  //   await User.findByIdAndUpdate(
+  //     { _id: userId },
+  //     {
+  //       $push: {
+  //         history: newHistory,
+  //       },
+  //     }
+  //     );
+  //   }catch(err) {
+    //     console.log("PUSH TO HISTORY:" , err)
+    //   }
+    
+    let massagesCounter=0;
+      for (let i = +startPoint; i < +endPoint; i++) {
     const DRIVER_GET_URL = `https://web.whatsapp.com/send?phone=${currentGroup.contacts[i].phoneNumber}`;
     const newHistory = {
       messageName: currentMessage.messageName,
@@ -130,8 +139,19 @@ ipcMain.on("start", async (event, item) => {
       startPoint: +startPoint,
       currentPoint: i + 1,
     };
-    currentUser.history[currentUser.history.length - 1] = newHistory;
-    await updateUserHistory(currentUser.history, userId);
+    // currentUser.history[currentUser.history.length - 1] = newHistory;
+    // try{
+    // await User.findByIdAndUpdate(
+    //   { _id: userId },
+    //   {
+    //     $set: {
+    //       history: currentUser.history,
+    //     },
+    //   }
+    // );
+    // }catch(err){
+    //   console.log("UPTADE HISTORY",err);
+    // }
 
     let newMessage = "";
     let sendButton = null;
@@ -145,10 +165,21 @@ ipcMain.on("start", async (event, item) => {
         1000000,
         "initial-program-start-working"
       );
-
+        let inputs,inputsCounter=0;
+      do{
+        inputs=await driver.findElements(By.className(elementsSelectores.messageInput));
+        console.log(inputs.length);
+        inputsCounter++;
+        await driver.sleep(1000);
+      }while(inputs.length < 2 && inputsCounter < 5)
+      if(inputs.length < 2 || inputsCounter===5){
+        continue;
+      }
+      console.log(inputsCounter);
+      console.log(inputs);
       for (
         let messageIndex = 0;
-        messageIndex < currentMessage.contentMessage.length;
+        massagesCounter < currentMessage.contentMessage.length;
         messageIndex++
       ) {
         let contactFirstName = currentGroup.contacts[i].contactProfile
@@ -176,10 +207,10 @@ ipcMain.on("start", async (event, item) => {
         }
 
         await driver.sleep(500);
-
         await driver.executeScript(
           `const inputs = document.getElementsByClassName('${elementsSelectores.messageInput}'); inputs[1].innerText = '${messageFormat}';`
         );
+        massagesCounter++;
 
         do {
           messageInput = await driver.wait(
@@ -223,7 +254,7 @@ ipcMain.on("start", async (event, item) => {
         let sandTimer = null;
 
         do {
-          await driver.sleep(1000);
+          await driver.sleep(500);
           sandTimer = await driver.findElements(
             By.css(elementsSelectores.sandClock)
           );
@@ -231,12 +262,21 @@ ipcMain.on("start", async (event, item) => {
         } while (sandTimer[0]);
         await driver.sleep(1000);
       }
-      let updateCurrentGroup = {
-        ...currentUser.currentGroup,
-        currentGroupIndex: i,
-      };
 
-      await updateMessagesStatus(userId);
+      massagesCounter=0;
+      // try{
+      // await User.findByIdAndUpdate(
+      //   { _id: userId },
+      //   {
+      //     $inc: {
+      //       messagesStatus: -1,
+      //     },
+      //   }
+      // );
+      // }catch(err){
+      //   console.log("MESSAGES STATUS:",err);
+      // }
+    
 
       let sendedToArcive = [];
       let counter = 0;
@@ -280,6 +320,7 @@ ipcMain.on("start", async (event, item) => {
       console.log("err.message:", err.message);
       if (err.message.includes("(setting 'innerText')")) {
         console.log("Error : innerText");
+        i--;
       }
       if (err.message.includes("initial-program-start-working")) {
         i--;
