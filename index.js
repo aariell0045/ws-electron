@@ -44,7 +44,9 @@ app.on("ready", () => {
   });
 
   mainWindow.on("closed", () => app.quit());
-  mainWindow.loadURL(`https://we-send-client-cloud.herokuapp.com/`);
+  mainWindow.loadURL(`http://localhost:3000`);
+  // https://we-send-client-cloud.herokuapp.com/
+  // http://localhost:3000
 });
 
 function insertNameToMessage(message, name) {
@@ -61,6 +63,7 @@ ipcMain.on("upload:file", async (event, props) => {
     },
   });
   await uploadWindow.loadFile("./index.html");
+  uploadWindow.webContents.send("fetch:data-table", props)
 });
 
 ipcMain.on("upload-finish", (event, dataTable) => {
@@ -95,12 +98,12 @@ ipcMain.on("start", async (event, item) => {
 
   const startPoint = elementsSelectores.starterIndex;
   const endPoint = elementsSelectores.endIndex;
-  // let currentUser ;
-  // try{
-  // currentUser = await User.findById({ _id: userId });
-  // }catch(err){
-  //   console.log("CURRENTUSER:",err);
-  // }
+  let currentUser ;
+  try{
+  currentUser = await User.findById({ _id: userId });
+  }catch(err){
+    console.log("CURRENTUSER:",err);
+  }
 
 
   const currentDate = createFullDateWidthCurrentTime();
@@ -112,21 +115,11 @@ ipcMain.on("start", async (event, item) => {
     startPoint: +startPoint,
     currentPoint: +startPoint,
   };
+  currentUser.history.push(newHistory);
 
   console.log("start:", startPoint);
   console.log("end:", endPoint);
-  // try{
-  //   await User.findByIdAndUpdate(
-  //     { _id: userId },
-  //     {
-  //       $push: {
-  //         history: newHistory,
-  //       },
-  //     }
-  //     );
-  //   }catch(err) {
-    //     console.log("PUSH TO HISTORY:" , err)
-    //   }
+
     
     let massagesCounter=0;
       for (let i = +startPoint; i < +endPoint; i++) {
@@ -139,19 +132,19 @@ ipcMain.on("start", async (event, item) => {
       startPoint: +startPoint,
       currentPoint: i + 1,
     };
-    // currentUser.history[currentUser.history.length - 1] = newHistory;
-    // try{
-    // await User.findByIdAndUpdate(
-    //   { _id: userId },
-    //   {
-    //     $set: {
-    //       history: currentUser.history,
-    //     },
-    //   }
-    // );
-    // }catch(err){
-    //   console.log("UPTADE HISTORY",err);
-    // }
+    currentUser.history[currentUser.history.length - 1] = newHistory;
+    try{
+    await User.findByIdAndUpdate(
+      { _id: userId },
+      {
+        $set: {
+          history: currentUser.history,
+        },
+      }
+    );
+    }catch(err){
+      console.log("UPTADE HISTORY",err);
+    }
 
     let newMessage = "";
     let sendButton = null;
@@ -264,18 +257,18 @@ ipcMain.on("start", async (event, item) => {
       }
 
       massagesCounter=0;
-      // try{
-      // await User.findByIdAndUpdate(
-      //   { _id: userId },
-      //   {
-      //     $inc: {
-      //       messagesStatus: -1,
-      //     },
-      //   }
-      // );
-      // }catch(err){
-      //   console.log("MESSAGES STATUS:",err);
-      // }
+      try{
+      await User.findByIdAndUpdate(
+        { _id: userId },
+        {
+          $inc: {
+            messagesStatus: -1,
+          },
+        }
+      );
+      }catch(err){
+        console.log("MESSAGES STATUS:",err);
+      }
     
 
       let sendedToArcive = [];

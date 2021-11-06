@@ -1,6 +1,11 @@
 const { ipcMain, ipcRenderer } = require("electron");
 const XLSX = require("xlsx");
 const input = document.querySelector("input");
+let currentData = {}
+ipcRenderer.on("fetch:data-table",  (event, uploadFileData) => {
+  currentData = uploadFileData 
+})
+
 input.addEventListener("change", function (e) {
   const file = e.target.files[0];
   const reader = new FileReader();
@@ -19,7 +24,15 @@ input.addEventListener("change", function (e) {
         tempArray.push(data[i][key]);
       }
       ws.push(tempArray);
-    };
-    ipcRenderer.send("upload-finish", ws);
+    }
+    currentData.excelFile = ws;
+    await fetch(
+      `https://www.ws-we-send.com/group`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentData),
+      }
+    );
   };
 });
