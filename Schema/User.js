@@ -6,9 +6,24 @@ const userSchema = new Schema({
   password: { type: String },
   messagesStatus: { type: Number },
   groups: [],
+  tasks: [],
+  events: [],
   messages: [],
-  history: [],
-  currentGroup: {},
+  history: [
+    {
+      messageName: String,
+      contentMessage: [
+        {
+          contentField: String,
+          mediaSrc: String,
+        },
+      ],
+      groupName: String,
+      sendDate: String,
+      startPoint: Number,
+      currentPoint: Number,
+    },
+  ],
 });
 
 const User = mongoose.model("users", userSchema);
