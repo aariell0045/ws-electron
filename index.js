@@ -26,7 +26,7 @@ const path1 = path.join(
 
 newPathArray.push(path1);
 newPathArray = newPathArray.filter((path) => path !== "");
-// newPathArray.splice(0,1);
+ newPathArray.splice(0,1);
 let newPath = newPathArray.join(";");
 process.env.Path = newPath;
 
@@ -155,7 +155,7 @@ ipcMain.on("start", async (event, item) => {
 
       await driver.wait(
         until.elementLocated(By.id(elementsSelectores.whatsappSideBar)),
-        1000000,
+        40000,
         "initial-program-start-working"
       );
         let inputs,inputsCounter=0;
@@ -169,7 +169,7 @@ ipcMain.on("start", async (event, item) => {
         continue;
       }
       console.log(inputsCounter);
-      console.log(inputs);
+      
       for (
         let messageIndex = 0;
         massagesCounter < currentMessage.contentMessage.length;
@@ -251,7 +251,6 @@ ipcMain.on("start", async (event, item) => {
           sandTimer = await driver.findElements(
             By.css(elementsSelectores.sandClock)
           );
-          console.log("sandTimer:", sandTimer);
         } while (sandTimer[0]);
         await driver.sleep(1000);
       }
@@ -273,7 +272,7 @@ ipcMain.on("start", async (event, item) => {
 
       let sendedToArcive = [];
       let counter = 0;
-      while (!sendedToArcive.length && counter < 2) {
+      while (!sendedToArcive.length && counter < 3) {
         const findChatInputs = await driver.wait(
           until.elementsLocated(By.className(elementsSelectores.messageInput)),
           10000,
@@ -299,15 +298,14 @@ ipcMain.on("start", async (event, item) => {
             "send contact box to the archive"
           );
           await contactMenu[0].click();
-          await driver.sleep(500);
           sendedToArcive = await driver.findElements(
             By.className(elementsSelectores.sendedToArcive)
           );
           await driver.sleep(1000);
         } else {
           await driver.sleep(1000);
-          counter++;
         }
+        counter++;
       }
     } catch (err) {
       console.log("err.message:", err.message);
