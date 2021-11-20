@@ -107,10 +107,18 @@ ipcMain.on("start", async (event, item) => {
 	let currentUser;
 	try {
 		currentUser = await User.findById({ _id: userId });
-		console.log(currentUser.validPhones);
+		console.log(currentUser["validPhones"]);
 		const local = await driver.executeScript(`return window.localStorage;`);
-		if (currentUser.validPhones.length) {
-			if (!local["last-wid"].includes(currentUser.validPhones)) {
+		if (currentUser["validPhones"]) {
+			let validPhone;
+			for (let phone of currentUser["validPhones"]) {
+				validPhone = local["last-wid"].includes(phone);
+				if (validPhone) {
+					break;
+				}
+			}
+
+			if (!validPhone) {
 				await driver.quit();
 				errorWindow = new BrowserWindow({
 					webPreferences: {
@@ -124,6 +132,7 @@ ipcMain.on("start", async (event, item) => {
 				errorWindow.resizable = false;
 
 				errorWindow.loadFile("./error.html");
+				return;
 			}
 		} else {
 			await driver.quit();
@@ -139,6 +148,7 @@ ipcMain.on("start", async (event, item) => {
 			errorWindow.resizable = false;
 
 			errorWindow.loadFile("./error.html");
+			return;
 		}
 	} catch (err) {
 		console.log("CURRENTUSER:", err);
