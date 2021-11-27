@@ -4,15 +4,9 @@ const { ipcMain, ipcRenderer } = require("electron");
 const mongoose = require("mongoose");
 const User = require("./Schema/User");
 require("chromedriver").path;
-const {
-	Builder,
-	By,
-	Key,
-	until,
-	Capabilities,
-	Actions,
-} = require("selenium-webdriver");
+const { Builder, By, Key, until, Capabilities, Actions } = require("selenium-webdriver");
 const path = require("path");
+const packageJson = require("./package.json");
 
 const { createFullDateWidthCurrentTime } = require("./handlers/date-handlers");
 let mainWindow;
@@ -20,20 +14,16 @@ let uploadWindow;
 let errorWindow;
 const env = process.env.Path;
 let newPathArray = env.split(";");
-const path1 = path.join(
-	__dirname +
-		`../../app.asar.unpacked\\node_modules\\chromedriver\\lib\\chromedriver;`
-);
+const path1 = path.join(__dirname + `../../app.asar.unpacked\\node_modules\\chromedriver\\lib\\chromedriver;`);
 
 newPathArray.push(path1);
 newPathArray = newPathArray.filter((path) => path !== "");
-// newPathArray.splice(0, 1);
+newPathArray.splice(0, 1);
 let newPath = newPathArray.join(";");
 process.env.Path = newPath;
 
 app.on("ready", async () => {
-	const mongooseURI =
-		"mongodb+srv://toam:123987456tofo@ws.ppnha.mongodb.net/ws";
+	const mongooseURI = "mongodb+srv://toam:123987456tofo@ws.ppnha.mongodb.net/ws";
 	mongoose.connect(mongooseURI, {
 		useNewUrlParser: true,
 		useUnifiedTopology: true,
@@ -46,7 +36,8 @@ app.on("ready", async () => {
 	});
 
 	mainWindow.on("closed", () => app.quit());
-	await mainWindow.loadURL(`http://localhost:3000`);
+	await mainWindow.loadURL(`https://ws-we-send-client-cloud.herokuapp.com/`);
+	// https://we-send-client-cloud.herokuapp.com/
 	// https://we-send-client-cloud.herokuapp.com/
 	// http://localhost:3000
 });
@@ -59,13 +50,23 @@ function insertNameToMessage(message, name) {
 
 ipcMain.on("upload:file", async (event, props) => {
 	uploadWindow = new BrowserWindow({
+		width: 500,
+		height: 500,
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false,
 		},
 	});
+	uploadWindow.menuBarVisible = false;
+	uploadWindow.resizable = false;
 	await uploadWindow.loadFile("./index.html");
 	uploadWindow.webContents.send("fetch:data-table", props);
+});
+
+ipcMain.on("check:version", (event, version) => {
+	if (packageJson.version !== version) {
+		app.quit();
+	}
 });
 
 ipcMain.on("upload-finish", (event, dataTable) => {
@@ -74,6 +75,10 @@ ipcMain.on("upload-finish", (event, dataTable) => {
 
 ipcMain.on("close", () => {
 	errorWindow.close();
+});
+
+ipcMain.on("finish:uploadFile", () => {
+	uploadWindow.close();
 });
 
 ipcMain.on("start", async (event, item) => {
@@ -85,10 +90,7 @@ ipcMain.on("start", async (event, item) => {
 	caps_.setPageLoadStrategy(caps.setPageLoadStrategy);
 	caps_.setAlertBehavior(caps.setAlertBehavior);
 
-	let driver = await new Builder()
-		.withCapabilities(caps_)
-		.forBrowser(forBrowser)
-		.build();
+	let driver = await new Builder().withCapabilities(caps_).forBrowser(forBrowser).build();
 	await driver.get("https://web.whatsapp.com/"); // return null
 
 	await driver.wait(
@@ -97,10 +99,6 @@ ipcMain.on("start", async (event, item) => {
 		"initial-program-start-working",
 		5000
 	);
-
-	//=======================================
-	/*checking if this user is valid to send messages */
-	//=======================================
 
 	const startPoint = elementsSelectores.starterIndex;
 	const endPoint = elementsSelectores.endIndex;
@@ -208,31 +206,21 @@ ipcMain.on("start", async (event, item) => {
 			let inputs,
 				inputsCounter = 0;
 			do {
-				inputs = await driver.findElements(
-					By.className(elementsSelectores.messageInput)
-				);
+				inputs = await driver.findElements(By.className(elementsSelectores.messageInput));
 				console.log(inputs.length);
 				inputsCounter++;
-				await driver.sleep(1000);
+				await driver.sleep(2500);
 			} while (inputs.length < 2 && inputsCounter < 5);
 			if (inputs.length < 2 || inputsCounter === 5) {
 				continue;
 			}
 			console.log(inputsCounter);
 
-			for (
-				let messageIndex = 0;
-				massagesCounter < currentMessage.contentMessage.length;
-				messageIndex++
-			) {
-				let contactFirstName = currentGroup.contacts[i].contactProfile
-					.contactFirstName
+			for (let messageIndex = 0; massagesCounter < currentMessage.contentMessage.length; messageIndex++) {
+				let contactFirstName = currentGroup.contacts[i].contactProfile.contactFirstName
 					? currentGroup.contacts[i].contactProfile.contactFirstName
 					: "";
-				newMessage = insertNameToMessage(
-					currentMessage.contentMessage[messageIndex].contentField,
-					contactFirstName
-				);
+				newMessage = insertNameToMessage(currentMessage.contentMessage[messageIndex].contentField, contactFirstName);
 				if (
 					!currentMessage.contentMessage[messageIndex].mediaSrc &&
 					!currentMessage.contentMessage[messageIndex].contentField
@@ -257,9 +245,7 @@ ipcMain.on("start", async (event, item) => {
 
 				do {
 					messageInput = await driver.wait(
-						until.elementsLocated(
-							By.className(elementsSelectores.messageInput)
-						),
+						until.elementsLocated(By.className(elementsSelectores.messageInput)),
 						4000,
 						"Message-Input"
 					);
@@ -274,21 +260,14 @@ ipcMain.on("start", async (event, item) => {
 						);
 						await openMediaSpan.click();
 						await driver.sleep(1000);
-						const inputFile = await driver.wait(
-							until.elementLocated(By.css(elementsSelectores.inputFile)),
-							10000
-						);
+						const inputFile = await driver.wait(until.elementLocated(By.css(elementsSelectores.inputFile)), 10000);
 						await inputFile.sendKeys(mediaSrc);
 						sendButton = await driver.wait(
-							until.elementsLocated(
-								By.className(elementsSelectores.sendButtonWidthMedia)
-							),
+							until.elementsLocated(By.className(elementsSelectores.sendButtonWidthMedia)),
 							10000
 						);
 					} else {
-						sendButton = await driver.findElements(
-							By.className(elementsSelectores.sendButton)
-						);
+						sendButton = await driver.findElements(By.className(elementsSelectores.sendButton));
 					}
 				} while (!sendButton[0]);
 
@@ -298,9 +277,7 @@ ipcMain.on("start", async (event, item) => {
 
 				do {
 					await driver.sleep(500);
-					sandTimer = await driver.findElements(
-						By.css(elementsSelectores.sandClock)
-					);
+					sandTimer = await driver.findElements(By.css(elementsSelectores.sandClock));
 				} while (sandTimer[0]);
 				await driver.sleep(1000);
 			}
@@ -329,14 +306,9 @@ ipcMain.on("start", async (event, item) => {
 					3000
 				);
 
-				await findChatInputs[0].sendKeys(
-					currentGroup.contacts[i].phoneNumber,
-					Key.ENTER
-				);
+				await findChatInputs[0].sendKeys(currentGroup.contacts[i].phoneNumber, Key.ENTER);
 
-				const contactBox = await driver.findElements(
-					By.className(elementsSelectores.contactBox)
-				);
+				const contactBox = await driver.findElements(By.className(elementsSelectores.contactBox));
 
 				if (contactBox.length) {
 					await actions.contextClick(contactBox[0]).perform();
@@ -347,9 +319,7 @@ ipcMain.on("start", async (event, item) => {
 						"send contact box to the archive"
 					);
 					await contactMenu[0].click();
-					sendedToArcive = await driver.findElements(
-						By.className(elementsSelectores.sendedToArcive)
-					);
+					sendedToArcive = await driver.findElements(By.className(elementsSelectores.sendedToArcive));
 					await driver.sleep(1000);
 				} else {
 					await driver.sleep(1000);
@@ -375,10 +345,7 @@ ipcMain.on("start", async (event, item) => {
 			}
 			if (err.message.includes("unexpected alert open")) {
 				console.log("unexpected alert open");
-				const body = await driver.wait(
-					until.elementLocated(By.tagName("body")),
-					3000
-				);
+				const body = await driver.wait(until.elementLocated(By.tagName("body")), 3000);
 				body.sendKeys(Key.ENTER);
 			}
 
